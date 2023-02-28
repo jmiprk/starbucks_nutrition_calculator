@@ -22,11 +22,13 @@ all_iced_drinks <- c(frappuccinos, cold_coffees, iced_teas, cold_drinks)
 
 drink_types <- append(unique(nutrition$type), 'All', after=0)
 
+sweeteners <- read_excel('starbucks_sweeteners.xlsx')
+
 sauces <- read_excel('starbucks_sauces.xlsx')
 sauces[,c(-1, -2)] <- sapply(sauces[,c(-1, -2)], as.integer)
-
 #sauces[,-1] <- sapply(sauces[,-1], as.integer)
 sauce_names <- sort(unique(sauces$name))
+
 syrups <- read_excel('starbucks_syrups.xlsx')
 syrups[,c(-1, -2)] <- sapply(syrups[,c(-1, -2)], as.integer)
 syrup_names <- sort(unique(syrups$name))
@@ -39,9 +41,6 @@ vectorBulletList <- function(vector) {
            "</li></ul>")   
   }
 }
-
-
-#tags$div(tags$ul(tags$li(
 
 # Define UI for application
 ui <- fluidPage(
@@ -80,24 +79,35 @@ ui <- fluidPage(
         ),
       
       fluidRow(
-        column(12,
+        column(10,
         selectizeInput('liquid_sweeteners',
                        label = 'Sweeteners', 
                        choices = c('Classic Syrup', 'Honey Blend', 'Liquid Cane Sugar'), 
                        options = list(
                          placeholder = 'Add Liquid Sweetener',
                          onInitialize = I('function() { this.setValue(""); }')
-                       ))
-        ),
-        column(12,
+                       ))),
+        column(2,
+               actionButton(
+                 "add_liquid_sweeteners",
+                 "Add"
+               ),
+               style = "margin-top: 25px;",
+               style = "margin-left: -15px;"),
+        column(10,
         selectizeInput('sweetener_packets',
                        label = NULL,
                        choices = c('Honey', 'Splenda', 'Stevia in the Raw', 'Sugar', 'Sugar in the Raw'), 
                        options = list(
                          placeholder = 'Add Sweetener Packet',
                          onInitialize = I('function() { this.setValue(""); }')
-                       ))
-      )
+                       ))),
+        column(2,
+               actionButton(
+                 "add_sweetener_packets",
+                 "Add"
+               ),
+               style = "margin-left: -15px;"),
       ),
       helpText(tags$b('Flavors')),
       fluidRow(
@@ -148,6 +158,7 @@ ui <- fluidPage(
     mainPanel(
       fluidRow(
         textOutput('selected_drink'),
+        htmlOutput('selected_sweeteners'),
         htmlOutput('selected_sauces'),
         htmlOutput('selected_syrups')
         ),
@@ -197,6 +208,7 @@ server <- function(input, output, session) {
   
   data <- reactiveVal()
   text <- reactiveVal()
+  sweeteners_list <- reactiveValues()
   sauce_list <- reactiveValues()
   syrup_list <- reactiveValues()
   
@@ -207,9 +219,46 @@ server <- function(input, output, session) {
                           text(paste('You ordered a ',
                                      input$size,
                                      input$drink))
+                          sweeteners_list$dList <- NULL
                           sauce_list$dList <- NULL
                           syrup_list$dList <- NULL
                           })
+  
+  observeEvent(input$add_liquid_sweeteners,
+               {
+
+                 temp <- rbindlist(list(data(), sweeteners[sweeteners$name==input$liquid_sweeteners,][,c(-1)]),
+                                   fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
+                 data(temp)
+                 
+                 sweeteners_list$dList <- c(isolate(sweeteners_list$dList), input$liquid_sweeteners)
+                 updateSelectizeInput(session, 
+                                      'liquid_sweeteners',
+                                      label = 'Sweeteners',
+                                      choices = c('Classic Syrup', 'Honey Blend', 'Liquid Cane Sugar'), 
+                                      options = list(
+                                        placeholder = 'Add Liquid Sweetener',
+                                        onInitialize = I('function() { this.setValue(""); }')
+                                      ))
+               })
+  
+  observeEvent(input$add_sweetener_packets,
+               {
+                 
+                 temp <- rbindlist(list(data(), sweeteners[sweeteners$name==input$sweetener_packets,][,c(-1)]),
+                                   fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
+                 data(temp)
+                 
+                 sweeteners_list$dList <- c(isolate(sweeteners_list$dList), input$sweetener_packets)
+                 updateSelectizeInput(session, 
+                                      'sweetener_packets',
+                                      label = NULL,
+                                      choices = c('Honey', 'Splenda', 'Stevia in the; Raw', 'Sugar', 'Sugar in the Raw'), 
+                                      options = list(
+                                        placeholder = 'Add Sweetener Packet',
+                                        onInitialize = I('function() { this.setValue(""); }')
+                                      ))
+               })
   
   observeEvent(input$add_sauce,
                {
@@ -283,6 +332,10 @@ server <- function(input, output, session) {
     text()
   })
   
+  output$selected_sweeteners <- renderText({
+    vectorBulletList(sweeteners_list$dList)
+  })
+
   output$selected_sauces <- renderText({
     vectorBulletList(sauce_list$dList)
   })
@@ -308,7 +361,7 @@ server <- function(input, output, session) {
                         protein = paste(toString(protein), ' ', 'g'),
                         caffeine = paste(toString(caffeine), ' ', 'mg')))
     },
-    digits=1,
+    digits=0,
     height='1000px',
     colnames = FALSE,
     rownames = TRUE
