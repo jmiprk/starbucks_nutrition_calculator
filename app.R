@@ -36,9 +36,8 @@ syrup_names <- sort(unique(syrups$name))
 vectorBulletList <- function(vector) {
   if(length(vector > 1)) {
     paste0("<ul><li>", 
-           paste0(
-             paste0(vector, collapse = ""), collapse = "</li><li>"),
-           "</li></ul>")   
+           paste0(vector, collapse = '</li><li>'),
+           '</li></ul>')   
   }
 }
 
@@ -93,7 +92,8 @@ ui <- fluidPage(
                  "Add"
                ),
                style = "margin-top: 25px;",
-               style = "margin-left: -15px;"),
+               style = "margin-left: -15px;")),
+      fluidRow(
         column(10,
         selectizeInput('sweetener_packets',
                        label = NULL,
@@ -107,14 +107,14 @@ ui <- fluidPage(
                  "add_sweetener_packets",
                  "Add"
                ),
-               style = "margin-left: -15px;"),
+               style = "margin-left: -15px;")
       ),
       helpText(tags$b('Flavors')),
       fluidRow(
         column(3, 
                numericInput('sauce_pumps',
                          label = 'Pumps',
-                         value = NULL)),
+                         value = 0)),
         column(7,
                selectizeInput('sauce',
                          label = 'Sauces',
@@ -136,7 +136,7 @@ ui <- fluidPage(
         column(3, 
                numericInput('syrup_pumps',
                          label = 'Pumps',
-                         value = ' ')),
+                         value = 0)),
         column(7,
                selectizeInput('syrup',
                      label = 'Syrups',
@@ -213,25 +213,25 @@ server <- function(input, output, session) {
   syrup_list <- reactiveValues()
   
   observeEvent(c(input$drink, input$size),
-                        {
-                          temp <- nutrition[nutrition$name == input$drink & nutrition$size == input$size,] %>% select(-1:-3)
-                          data(temp)
-                          text(paste('You ordered a ',
-                                     input$size,
-                                     input$drink))
-                          sweeteners_list$dList <- NULL
-                          sauce_list$dList <- NULL
-                          syrup_list$dList <- NULL
-                          })
+               {
+                 temp <- nutrition[nutrition$name == input$drink & nutrition$size == input$size,] %>% select(-1:-3)
+                 data(temp)
+                 text(paste('You ordered a ',
+                            input$size,
+                            input$drink))
+                 sweeteners_list$dList <- NULL
+                 sauce_list$dList <- NULL
+                 syrup_list$dList <- NULL
+                 })
   
   observeEvent(input$add_liquid_sweeteners,
                {
-
                  temp <- rbindlist(list(data(), sweeteners[sweeteners$name==input$liquid_sweeteners,][,c(-1)]),
                                    fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
                  data(temp)
+
+                 sweeteners_list$dList <- c(isolate(sweeteners_list$dList), isolate(input$liquid_sweeteners))
                  
-                 sweeteners_list$dList <- c(isolate(sweeteners_list$dList), input$liquid_sweeteners)
                  updateSelectizeInput(session, 
                                       'liquid_sweeteners',
                                       label = 'Sweeteners',
@@ -244,20 +244,19 @@ server <- function(input, output, session) {
   
   observeEvent(input$add_sweetener_packets,
                {
-                 
                  temp <- rbindlist(list(data(), sweeteners[sweeteners$name==input$sweetener_packets,][,c(-1)]),
                                    fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
                  data(temp)
                  
-                 sweeteners_list$dList <- c(isolate(sweeteners_list$dList), input$sweetener_packets)
-                 updateSelectizeInput(session, 
+                 sweeteners_list$dList <- c(isolate(sweeteners_list$dList), isolate(input$sweetener_packets))
+                 updateSelectizeInput(session,
                                       'sweetener_packets',
                                       label = NULL,
                                       choices = c('Honey', 'Splenda', 'Stevia in the; Raw', 'Sugar', 'Sugar in the Raw'), 
                                       options = list(
                                         placeholder = 'Add Sweetener Packet',
                                         onInitialize = I('function() { this.setValue(""); }')
-                                      ))
+                                        ))
                })
   
   observeEvent(input$add_sauce,
@@ -280,9 +279,9 @@ server <- function(input, output, session) {
                    }
                  else if(input$sauce_pumps >= 1){
                    sauce_list$dList <- c(isolate(sauce_list$dList), paste(input$sauce_pumps,
-                                                                          'pumps of',
-                                                                          input$sauce))
-                 }
+                                                                            'pumps of',
+                                                                            input$sauce))
+                   }
                  
                  updateSelectizeInput(session, 
                                       'sauce',
@@ -291,7 +290,7 @@ server <- function(input, output, session) {
                                       options = list(
                                         placeholder = 'Add Sauce',
                                         onInitialize = I('function() { this.setValue(""); }')
-                                        ))
+                                      ))
                  
                  updateNumericInput(session,
                                     'sauce_pumps',
@@ -311,6 +310,7 @@ server <- function(input, output, session) {
                  temp <- rbindlist(list(data(), input$syrup_pumps * syrups[syrups$name==input$syrup,][,c(-1,-2)]),
                                    fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
                  data(temp)
+                 
                  if(input$syrup_pumps == 1){
                    syrup_list$dList <- c(isolate(syrup_list$dList), paste(input$syrup_pumps,
                                                                         'pump of',
