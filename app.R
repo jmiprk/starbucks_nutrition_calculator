@@ -1,4 +1,6 @@
 library(shiny)
+library(shinydashboard) 
+library(shinyjs)
 library(dplyr)
 library(tidyverse)
 library(readxl)
@@ -6,9 +8,11 @@ library(DT)
 library(plyr)
 library(data.table)
 
-nutrition <- read.table('sbux_nutrition.txt', sep=',', header=TRUE)
+# read nutrition data table
+nutrition <- read.table('data/sbux_nutrition.txt', sep=',', header=TRUE)
 nutrition[,c(-1:-3, -7)] <- sapply(nutrition[,c(-1:-3, -7)], as.integer)
 
+# subset nutrition data table based on drink type
 all_drinks <- sort(unique(nutrition$name))
 hot_coffees <- sort(unique(nutrition$name[nutrition$type == 'Hot Coffees']))
 hot_teas <- sort(unique(nutrition$name[nutrition$type == 'Hot Teas']))
@@ -22,19 +26,22 @@ all_iced_drinks <- c(frappuccinos, cold_coffees, iced_teas, cold_drinks)
 
 drink_types <- append(unique(nutrition$type), 'All', after=0)
 
-sweeteners <- read_excel('starbucks_sweeteners.xlsx')
+# read sweeteners data table
+sweeteners <- read_excel('data/starbucks_sweeteners.xlsx')
 
-sauces <- read_excel('starbucks_sauces.xlsx')
+# read sauces data table and convert 
+sauces <- read_excel('data/starbucks_sauces.xlsx')
 sauces[,c(-1, -2)] <- sapply(sauces[,c(-1, -2)], as.integer)
-#sauces[,-1] <- sapply(sauces[,-1], as.integer)
+
+
 sauce_names <- sort(unique(sauces$name))
 
-syrups <- read_excel('starbucks_syrups.xlsx')
+syrups <- read_excel('data/starbucks_syrups.xlsx')
 syrups[,c(-1, -2)] <- sapply(syrups[,c(-1, -2)], as.integer)
 syrup_names <- sort(unique(syrups$name))
 
 vectorBulletList <- function(vector) {
-  if(length(vector > 1)) {
+  if(length(vector) > 0) {
     paste0("<ul><li>", 
            paste0(vector, collapse = '</li><li>'),
            '</li></ul>')   
@@ -42,7 +49,14 @@ vectorBulletList <- function(vector) {
 }
 
 # Define UI for application
-ui <- fluidPage(
+ui <- function(request){
+  header <- dashboardHeader(title = 'Nutrition Calculator')
+  
+  sidebar <- dashboardSidebar(disable = TRUE)
+  
+  body <- dashboardBody(
+  
+  fluidPage(
   
   # Application title
   titlePanel("Starbucks Nutrition Calculator"),
@@ -108,7 +122,7 @@ ui <- fluidPage(
                  "Add"
                ),
                style = "margin-left: -15px;")
-      ),
+        ),
       helpText(tags$b('Flavors')),
       fluidRow(
         column(3, 
@@ -171,6 +185,9 @@ ui <- fluidPage(
     )
   )
 )
+)
+  dashboardPage(header, sidebar, body)
+}
 
 server <- function(input, output, session) {
   
@@ -212,6 +229,35 @@ server <- function(input, output, session) {
   sauce_list <- reactiveValues()
   syrup_list <- reactiveValues()
   
+  onRestore(function(state) {
+    data(state$values$data)
+    text(state$values$text)
+    
+    updateSelectizeInput(session, 
+                         'drink',
+                         label = NULL, 
+                         choices = all_drinks, 
+                         selected = state$values$drink, 
+                         options = list(
+                           placeholder = 'Select a drink',
+                           onInitialize = I('function() { this.setValue(""); }')
+                         ))
+    
+    updateSelectizeInput(session, 
+                         'size',
+                         label = 'Size', 
+                         choices = c('Short', 'Tall', 'Grande', 'Venti'), 
+                         selected = state$values$size, 
+                         options = list(
+                           placeholder = 'Select a size',
+                           onInitialize = I('function() { this.setValue(""); }')
+                         ))
+    
+    sweeteners_list$dList <- state$values$sweeteners
+    sauce_list$dList <- state$values$sauce
+    syrup_list$dList <- state$values$syrup
+    })
+  
   observeEvent(c(input$drink, input$size),
                {
                  temp <- nutrition[nutrition$name == input$drink & nutrition$size == input$size,] %>% select(-1:-3)
@@ -229,7 +275,11 @@ server <- function(input, output, session) {
                  temp <- rbindlist(list(data(), sweeteners[sweeteners$name==input$liquid_sweeteners,][,c(-1)]),
                                    fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
                  data(temp)
-
+                 
+                 if (input$liquid_sweeteners == ''){
+                   sweeteners_list$dList
+                 }
+                 else {
                  sweeteners_list$dList <- c(isolate(sweeteners_list$dList), isolate(input$liquid_sweeteners))
                  
                  updateSelectizeInput(session, 
@@ -240,6 +290,7 @@ server <- function(input, output, session) {
                                         placeholder = 'Add Liquid Sweetener',
                                         onInitialize = I('function() { this.setValue(""); }')
                                       ))
+                 }
                })
   
   observeEvent(input$add_sweetener_packets,
@@ -248,15 +299,20 @@ server <- function(input, output, session) {
                                    fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
                  data(temp)
                  
-                 sweeteners_list$dList <- c(isolate(sweeteners_list$dList), isolate(input$sweetener_packets))
-                 updateSelectizeInput(session,
-                                      'sweetener_packets',
-                                      label = NULL,
-                                      choices = c('Honey', 'Splenda', 'Stevia in the; Raw', 'Sugar', 'Sugar in the Raw'), 
-                                      options = list(
-                                        placeholder = 'Add Sweetener Packet',
-                                        onInitialize = I('function() { this.setValue(""); }')
-                                        ))
+                 if (input$sweetener_packets == ''){
+                   sweeteners_list$dList
+                 }
+                 else {
+                   sweeteners_list$dList <- c(isolate(sweeteners_list$dList), isolate(input$sweetener_packets))
+                   updateSelectizeInput(session,
+                                       'sweetener_packets',
+                                        label = NULL,
+                                        choices = c('Honey', 'Splenda', 'Stevia in the; Raw', 'Sugar', 'Sugar in the Raw'), 
+                                       options = list(
+                                          placeholder = 'Add Sweetener Packet',
+                                         onInitialize = I('function() { this.setValue(""); }')
+                                          ))
+                 }
                })
   
   observeEvent(input$add_sauce,
@@ -272,12 +328,15 @@ server <- function(input, output, session) {
                                    fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
                  data(temp)
                  
-                 if(input$sauce_pumps == 1){
+                 if (input$sauce_pumps == 0 || input$sauce == ''){
+                   sauce_list$dList
+                 }
+                 else if (input$sauce_pumps == 1) {
                    sauce_list$dList <- c(isolate(sauce_list$dList), paste(input$sauce_pumps,
                                                                           'pump of',
                                                                           input$sauce))
                    }
-                 else if(input$sauce_pumps >= 1){
+                 else if (input$sauce_pumps >= 1) {
                    sauce_list$dList <- c(isolate(sauce_list$dList), paste(input$sauce_pumps,
                                                                             'pumps of',
                                                                             input$sauce))
@@ -295,7 +354,7 @@ server <- function(input, output, session) {
                  updateNumericInput(session,
                                     'sauce_pumps',
                                     label = 'Pumps',
-                                    value = NA)
+                                    value = 0)
                  })
   
   observeEvent(input$add_syrup,
@@ -311,7 +370,10 @@ server <- function(input, output, session) {
                                    fill = TRUE)[,lapply(.SD, sum, na.rm = TRUE)]
                  data(temp)
                  
-                 if(input$syrup_pumps == 1){
+                 if(input$syrup_pumps == 0 || input$syrup == ''){
+                   syrup_list$dList
+                 }
+                 else if(input$syrup_pumps == 1){
                    syrup_list$dList <- c(isolate(syrup_list$dList), paste(input$syrup_pumps,
                                                                         'pump of',
                                                                         input$syrup))
@@ -322,12 +384,21 @@ server <- function(input, output, session) {
                                                                          input$syrup))
                  }
                  
+                 updateSelectizeInput(session, 
+                                      'syrup',
+                                      label = 'Syrups',
+                                      choices = syrup_names, 
+                                      options = list(
+                                        placeholder = 'Add Syrup',
+                                        onInitialize = I('function() { this.setValue(""); }')
+                                      ))
+                 
                  updateNumericInput(session,
                                     'syrup_pumps',
                                     label = 'Pumps',
-                                    value = NA)
+                                    value = 0)
                })
-
+  
   output$selected_drink <- renderText({
     text()
   })
@@ -353,18 +424,21 @@ server <- function(input, output, session) {
       need(data() > 0,
            "No nutritional information for this size! Please select another size."
       ))
-    t(data() %>% mutate(fat = paste(toString(fat), ' ', 'g'),
-                        cholesterol = paste(toString(cholesterol), ' ', 'mg'),
-                        sodium = paste(toString(sodium), ' ', 'mg'), 
-                        carb = paste(toString(carb), ' ', 'g'),
-                        sugar = paste(toString(sugar), ' ', 'g'),
-                        protein = paste(toString(protein), ' ', 'g'),
-                        caffeine = paste(toString(caffeine), ' ', 'mg')))
+    c(
+      Calories = data()$calories,
+      Fat = paste(data()$fat, ' ', 'g'), 
+      Cholesterol = paste(data()$cholesterol, ' ', 'mg'),
+      Sodium = paste(data()$sodium, ' ', 'mg'),
+      Carb = paste(data()$carb, ' ', 'g'),
+      Sugar = paste(data()$sugar, ' ', 'g'),
+      Protein = paste(data()$protein, ' ', 'g'),
+      Caffeine = paste(data()$caffeine, ' ', 'mg')
+    ) %>% enframe()
     },
     digits=0,
     height='1000px',
     colnames = FALSE,
-    rownames = TRUE
+    rownames = FALSE
   )
   }
 
