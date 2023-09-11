@@ -5,9 +5,7 @@ account: jmiprk
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 8438092
-bundleId: 6899009
+bundleId: 7671049
 url: https://jmiprk.shinyapps.io/starbucks_nutrition_calculator/
-when: 1677613697.60845
-lastSyncTime: 1677613697.60847
 asMultiple: FALSE
 asStatic: FALSE
